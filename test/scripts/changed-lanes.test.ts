@@ -7,6 +7,7 @@ import {
   detectChangedLanes,
   isLiveDockerPackageScriptOnlyChange,
   isPackageScriptOnlyChange,
+  listChangedPathsFromGit,
 } from "../../scripts/changed-lanes.mjs";
 import {
   buildChangedCheckCrabboxArgs,
@@ -102,6 +103,34 @@ describe("scripts/changed-lanes", () => {
 
     expect(result.paths).toEqual(["scripts/new-check.mjs"]);
     expectLanes(result.lanes, { tooling: true });
+  });
+
+  it("falls back to worktree paths when the base ref is missing", () => {
+    const dir = makeTempRepoRoot(tempDirs, "openclaw-changed-lanes-missing-base-");
+    git(dir, ["init", "-q", "--initial-branch=main"]);
+    writeFileSync(path.join(dir, "README.md"), "initial\n", "utf8");
+    git(dir, ["add", "README.md"]);
+    git(dir, [
+      "-c",
+      "user.email=test@example.com",
+      "-c",
+      "user.name=Test User",
+      "commit",
+      "-q",
+      "-m",
+      "initial",
+    ]);
+
+    mkdirSync(path.join(dir, "scripts"), { recursive: true });
+    writeFileSync(path.join(dir, "scripts", "new-check.mjs"), "export {};\n", "utf8");
+
+    expect(
+      listChangedPathsFromGit({
+        base: "origin/main",
+        head: "HEAD",
+        cwd: dir,
+      }),
+    ).toEqual(["scripts/new-check.mjs"]);
   });
 
   it("includes deleted worktree files in the default local diff", () => {

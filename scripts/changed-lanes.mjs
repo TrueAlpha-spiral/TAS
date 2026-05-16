@@ -235,7 +235,14 @@ export function listChangedPathsFromGit(params) {
   if (!base) {
     return [];
   }
-  const rangePaths = runGitNameOnlyDiff([`${base}...${head}`], cwd);
+  let rangePaths = [];
+  try {
+    rangePaths = runGitNameOnlyDiff([`${base}...${head}`], cwd);
+  } catch (error) {
+    if (!isMissingGitRevisionError(error)) {
+      throw error;
+    }
+  }
   if (params.includeWorktree === false) {
     return rangePaths;
   }
@@ -257,6 +264,32 @@ function runGitNameOnlyDiff(extraArgs, cwd = process.cwd()) {
     maxBuffer: GIT_OUTPUT_MAX_BUFFER,
   });
   return output.split("\n").map(normalizeChangedPath).filter(Boolean);
+}
+
+function isMissingGitRevisionError(error) {
+  const stderr = getGitExecErrorText(error);
+  return (
+    /ambiguous argument/u.test(stderr) &&
+    /unknown revision or path not in the working tree/u.test(stderr)
+  );
+}
+
+function getGitExecErrorText(error) {
+  if (!(error instanceof Error)) {
+    return "";
+  }
+  if ("stderr" in error) {
+    if (typeof error.stderr === "string") {
+      return error.stderr;
+    }
+    if (Buffer.isBuffer(error.stderr)) {
+      return error.stderr.toString("utf8");
+    }
+  }
+  if (typeof error.cause === "string") {
+    return error.cause;
+  }
+  return typeof error.message === "string" ? error.message : "";
 }
 
 function runGitLsFiles(extraArgs, cwd = process.cwd()) {
