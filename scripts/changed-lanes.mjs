@@ -267,26 +267,29 @@ function runGitNameOnlyDiff(extraArgs, cwd = process.cwd()) {
 }
 
 function isMissingGitRevisionError(error) {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  const execStderr =
-    "stderr" in error && typeof error.stderr === "string"
-      ? error.stderr
-      : "stderr" in error && Buffer.isBuffer(error.stderr)
-        ? error.stderr.toString("utf8")
-        : "";
-  const stderr =
-    execStderr ||
-    (typeof error.cause === "string"
-      ? error.cause
-      : typeof error.message === "string"
-        ? error.message
-        : "");
+  const stderr = getGitExecErrorText(error);
   return (
     /ambiguous argument/u.test(stderr) &&
     /unknown revision or path not in the working tree/u.test(stderr)
   );
+}
+
+function getGitExecErrorText(error) {
+  if (!(error instanceof Error)) {
+    return "";
+  }
+  if ("stderr" in error) {
+    if (typeof error.stderr === "string") {
+      return error.stderr;
+    }
+    if (Buffer.isBuffer(error.stderr)) {
+      return error.stderr.toString("utf8");
+    }
+  }
+  if (typeof error.cause === "string") {
+    return error.cause;
+  }
+  return typeof error.message === "string" ? error.message : "";
 }
 
 function runGitLsFiles(extraArgs, cwd = process.cwd()) {
